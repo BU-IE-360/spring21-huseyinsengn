@@ -1,0 +1,169 @@
+---
+title: "HW1"
+author: "Huseyin Sengun"
+date: "19 04 2021"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## INTRODUCTION
+
+In this homework, I've tried to find what kind of a relationship between Total House Sales in Turkey, House Price Index, and Housing Loan Interest Rates. Dates are taken from EVDS, The time periods for all datasets are same and between January 2013 to January 2021. 
+
+## Required Packages
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(readr)
+library(readxl)
+library(data.table)
+library(GGally)
+library(skimr)
+library(ggcorrplot)
+library(plotly)
+```
+
+## Reading Datasets and Manipulation
+
+* All the dates are between 1/2013 - 1/2021. 
+
+```{r warning=FALSE, message=FALSE}
+housesales <- read_excel("toplamkonutsatis.xlsx")
+housepriceindex <- read_excel("konutfiyatindex.xlsx")
+interestrates <- read_excel("konutkredisifaizoranlari.xlsx")
+
+housesales = data.frame(date=as.yearmon(housesales$Tarih), value = housesales$Satis)
+
+housepriceindex = data.frame(date=as.yearmon(housepriceindex$Tarih), value=housepriceindex$`TP HKFE01`)
+
+interestrates = data.frame(date=as.yearmon(interestrates$Tarih), value=interestrates$`TP KTF12`)
+
+```
+
+## Example 1: Number of House Sales in Turkey 1/2013 - 1/2021
+
+```{r warning=FALSE, message=FALSE}
+hs <- ggplot(housesales, aes(x=date, y=value)) + geom_line() + labs(title = 'House Sales Statistics 2013/1 to 2021/1 ', x= "Date", y = "Number of Houses Sold") 
+
+hs
+
+hsly <- ggplotly(hs)
+
+hsly
+
+```
+* By looking to the graph, we can say that there is an increasing trend and some degree of seasonality until 2019. 
+
+* After 2019 and especially during the pandemic, the increasing trend has broken. There is a peak at June 2020, when housing loan interests are sharply decreased. Another reason is people delayed their buying decisions during the pandemic and in June, they probably think it's the true time to purchase a house.
+
+* There are seasonal changes in number of house sales. At December, sales increase and then sharply decrease in January. There are some other seasonal movements in other months too.
+
+
+
+## Example 2: House Price Index in Turkey 1/2013 - 1/2021
+
+```{r warning=FALSE, message=FALSE}
+pi <- ggplot(housepriceindex, aes(x=date, y=value)) + geom_line() + labs(title = 'House Price Index Between 2013/1 - 2021/1 ', x= "Date", y = "Price Index (TL) ") 
+
+pily <- ggplotly(pi)
+
+pily
+
+
+```
+* House Price Index is found by dividing the price of the house by its area. So, it's a measure of the price of a square meter of a house on average.
+
+* There is an increasing trend in the houseprice index except the second half of the 2018. Although there is an increasing trend at House Price Index, we can't compare it with inflation just by looking this graph. 
+
+* Also, the rate of increase have increased after May 2020. The reason is that with the decrease in the interest rates, landlords increased the prices of the houses. 
+
+* In addition to the decrease in the interest rates, due to the high inflation and cumulative demand, the rate of change is increased after May 2020.
+
+
+## Example 3: Housing Loan Interest Rates in Turkey 1/2013 - 1/2021
+```{r warning=FALSE, message=FALSE}
+hlir <- ggplot(interestrates, aes(x=date, y=value)) + geom_line() + labs(title = 'Housing Loan Interests Between 2013/1 - 2021/1 ', x= "Date", y = "Interest Rate") 
+
+hlirly <- ggplotly(hlir)
+
+hlirly
+```
+* The change in the interest rates depends on lots of factors. And it's determined by govermental agencies. We can not talk about seasonality here.
+
+* Since it's the same with CPI, we can analyze it through inflation. 
+
+* There are some sharp increases which can be explained by TL's depreciation.
+
+
+
+## Visualising House Sales and Interest Rates Together
+* Black line refers the house sales.
+```{r warning=FALSE, message=FALSE}
+df1 <- data.frame(housesales, interestrates)
+
+df1 <- df1[,-3]
+
+df1_graph <- ggplot(df1, aes(x=date)) + geom_line(aes(y=scale(value)), colour="black") + geom_line(aes(y=scale(value.1)), colour="blue")
+
+
+ggplotly(df1_graph)
+```
+* By looking to the graph until the second half of the 2018, there could be seen a negative correlation between House Sales and Interest Rates.
+
+* After 2018, this relationship can not be easily seen but there is still some degree of relation between House Sales and Interest Rates.
+
+
+## Visualising House Price Index and Interest Rates Together
+* Black line referes the House Price Index. 
+```{r warning=FALSE, message=FALSE}
+df2 <- data.frame(housepriceindex, interestrates)
+
+df2 <- df2[,-3]
+
+df2_graph <- ggplot(df2, aes(x=date)) + geom_line(aes(y=scale(value)), colour="black") + geom_line(aes(y=scale(value.1)), colour="blue")
+
+ggplotly(df2_graph)
+
+```
+* We can not compare just by looking this graph because we have to look yearly average of the Interest Rates and in this way we can compare House Price Index and Interest Rates to see which is performed better.
+
+
+
+
+### PART B ###
+* In this part, we will be looking whis keywords could be related to the above datas, seperately.
+
+
+## "emlakci" Keyword and House Sales
+```{r warning=FALSE, message=FALSE}
+emlakci <- read_excel("emlakcigoogletrend.xlsx")
+
+emlakci = data.frame(date=as.yearmon(emlakci$Ay), value = emlakci$Emlak)
+
+
+emlakci_graph <- ggplot(emlakci, aes(x=date, y=value)) + geom_line() + labs(title = ' emlakci Keyword Statistics ', x= "Date", y = " Portion ")
+
+ggplotly(emlakci_graph)
+
+df3 <- data.frame(housesales, emlakci)
+
+df3 <- df3[,-3]
+
+df3_graph <- ggplot(df3, aes(x=date)) + geom_line(aes(y=scale(value)), colour="black") + geom_line(aes(y=scale(value.1)), colour="blue")
+
+ggplotly(df3_graph)
+
+
+```
+* By looking the graph of "emlakci" search trends and House Sales, we can see a strong relationship between them.
+
+
+
+
