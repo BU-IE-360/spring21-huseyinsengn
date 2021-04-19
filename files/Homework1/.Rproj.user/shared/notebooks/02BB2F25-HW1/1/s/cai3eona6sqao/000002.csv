@@ -1,0 +1,5 @@
+"0","pi <- ggplot(housepriceindex, aes(x=date, y=value)) + geom_line() + labs(title = 'House Price Index Between 2013/1 - 2021/1 ', x= ""Date"", y = ""Price Index (TL) "") "
+"0",""
+"0","pily <- ggplotly(pi)"
+"0",""
+"0","pily"

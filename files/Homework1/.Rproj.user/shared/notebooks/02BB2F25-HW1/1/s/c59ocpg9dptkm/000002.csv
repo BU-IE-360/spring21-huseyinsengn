@@ -1,0 +1,7 @@
+"0","df2 <- data.frame(housepriceindex, interestrates)"
+"0",""
+"0","df2 <- df2[,-3]"
+"0",""
+"0","df2_graph <- ggplot(df2, aes(x=date)) + geom_line(aes(y=scale(value)), colour=""black"") + geom_line(aes(y=scale(value.1)), colour=""blue"")"
+"0",""
+"0","ggplotly(df2_graph)"

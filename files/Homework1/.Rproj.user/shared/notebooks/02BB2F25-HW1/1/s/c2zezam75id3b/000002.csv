@@ -1,0 +1,5 @@
+"0","hlir <- ggplot(interestrates, aes(x=date, y=value)) + geom_line() + labs(title = 'Housing Loan Interests Between 2013/1 - 2021/1 ', x= ""Date"", y = ""Interest Rate"") "
+"0",""
+"0","hlirly <- ggplotly(hlir)"
+"0",""
+"0","hlirly"

@@ -1,0 +1,8 @@
+"0",""
+"0","df3 <- data.frame(housesales, emlakci)"
+"0",""
+"0","df3 <- df3[,-3]"
+"0",""
+"0","df3_graph <- ggplot(df3, aes(x=date)) + geom_line(aes(y=scale(value)), colour=""black"") + geom_line(aes(y=scale(value.1)), colour=""blue"")"
+"0",""
+"0","ggplotly(df3_graph)"

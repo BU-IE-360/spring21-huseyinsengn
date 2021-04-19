@@ -1,0 +1,8 @@
+"0","emlakci <- read_excel(""emlakcigoogletrend.xlsx"")"
+"0",""
+"0","emlakci = data.frame(date=as.yearmon(emlakci$Ay), value = emlakci$Emlak)"
+"0",""
+"0",""
+"0","emlakci_graph <- ggplot(emlakci, aes(x=date, y=value)) + geom_line() + labs(title = ' emlakci Keyword Statistics ', x= ""Date"", y = "" Portion "")"
+"0",""
+"0","ggplotly(emlakci_graph)"
