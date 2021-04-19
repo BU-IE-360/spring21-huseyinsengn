@@ -1,7 +1,10 @@
 # Progress Journal
 
-## Week 0 (April 02)
+## Homework 0 (April 02)
 
-[Here](files/IE360_Spring21_Homework0.html) is my 5 interesting R examples.
+[Here](files/IE360_Spring21_Homework0.html) is my Homework 0.
 
-[Here](files/HW1.html) is my first homework.
+
+## Homework 1 (April 19)
+
+[Here](files/Homework/HW1.html) is my Homework 1.
