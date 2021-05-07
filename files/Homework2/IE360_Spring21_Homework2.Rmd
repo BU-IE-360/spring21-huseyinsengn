@@ -1,0 +1,695 @@
+<<<<<<< HEAD
+---
+title: Time Series Regression for Predicting Macroeconomic Indicators - Forecasting
+  of Newly Established Firms in April 2021
+author: "Huseyin Sengun - IE360 - Spring 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. INTRODUCTION
+
+The aim of this work is to forecast the total number of newly established firms in Turkey at April 2021 with creating and building some models.  
+
+Throughout the work, the datasets are taken between January 2013 and March 2021. Additionally, the models are created by using some independent variables that possibly affect the time series data, some seasonality factors and by using special periods such as coup attemp and Covid-19 pandemic.
+
+All the datas are taken from EVDS, which is Electronik Data Delivery System, and chosen independent factors are:
+  1. Industrial Price Index
+  2. Balance of Payment
+  3. Commercial Interest Loans
+  4. Financial Confidence Rate
+  5. Exchange Rate (TRY/USD)
+
+
+# 2.Preperation and Manipulation of Data
+
+
+```{r warning=FALSE, message=FALSE}
+library(ggplot2)
+library(lubridate)
+library(readxl)
+library(data.table)
+library(zoo)
+library(forecast)
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+```{r warning=FALSE, message=FALSE}
+alldata <- data.table(read_excel("D:/Spring 21 Dersler/IE360/HW3Data.xlsx"))
+#all the datas are from 2013-1 to 2021-3.
+#In IndProd index and BalanceofPayments data, 2021-3 values are missing. So, I take the mean of 2021-2 and 2020-3 and assigned this value to 2021-3 for these datasets.
+
+# Correcting the types of variable
+alldata[,Date:=ym(alldata[,Date])]
+
+head(alldata)
+
+ggplot(alldata, aes(x = Date, y= NewlyEst)) + geom_line(color="blue") + labs(title = "Total Number of Newly Established Firms in Turkey Between 2013-1 and 2020-3", x = "Date", y= "Newly Established Firms") + geom_point()
+
+
+```
+
+From the graph, we can conclude that there is an increasing trend.
+As the time moves, the fluctuations and deviances get bigger probably due to the economic and political instabilities.
+At the periods of coup attemp and starting of Covid-19 pandemic, we see sharp decreases.
+Finally, we can talk about some degrees of seasonality. The graph indicates that number of newly established firms is high in January, and low on July.
+
+
+```{r warning=FALSE, message=FALSE}
+alldata_zoo=zoo(alldata[,list(NewlyEst,IndProdIndex,BOP,ComLoanInterest,FinConf,ExRate)],alldata$Date)
+plot(alldata_zoo)
+
+str(alldata)
+
+```
+
+In these graphs, we can see how selected independent variables have changed in time.
+
+
+
+```{r warning=FALSE, message=FALSE}
+plot(x=alldata$NewlyEst/100, y=alldata$IndProdIndex, xlab = "Newly Established Firms", ylab = "Industrial Production Index")
+plot(x=alldata$NewlyEst/100, y=alldata$BOP, xlab = "Newly Established Firms", ylab = "Balance of Payments")
+plot(x=alldata$NewlyEst/100, y=alldata$ComLoanInterest, xlab = "Newly Established Firms", ylab = "Commercial Loan Interest Rate")
+plot(x=alldata$NewlyEst/100, y=alldata$FinConf, xlab = "Newly Established Firms", ylab = "Financial Confidence Rate")
+plot(x=alldata$NewlyEst/100, y=alldata$ExRate, xlab = "Newly Established Firms", ylab = "Exchange Rate")
+
+```
+In these 5 graphs, we will investigate the possible relationships between the numbers of Newly Established Firms and independent factors. Some of them have some degree of relationship but some of them looks like don't have relationship. 
+
+
+```{r warning=FALSE, message=FALSE}
+alldata <- alldata[, Trend:=1:.N]
+Month <- seq(1,12)
+alldata <- cbind(alldata,Month)
+firstmodel<- lm(NewlyEst~ Trend+as.factor(Month), alldata)
+alldata <- alldata[,Residual:=0]
+alldata$Residual[1] = NA
+alldata$Residual[2:99] <- residuals(firstmodel)[1:98]
+secondmodel <- lm(NewlyEst~ Trend+as.factor(Month)+Residual, alldata)
+
+summary(firstmodel)
+summary(secondmodel)
+
+checkresiduals(firstmodel)
+checkresiduals(secondmodel)
+alldata$Residual[1] = 0
+
+```
+
+First, I created a lineer regression model with using Trend and Months.
+In the second model, I added them Residuals.
+Second model has better R-Squared and Residual Standard Error values.  
+
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata$coup <- rep(0,99)
+alldata$coup[43:45] <- rep(1,3)
+
+alldata$pandemic <- rep(0,99)
+alldata$pandemic[88:89] <- c(1,1)
+
+alldata$Trend <- 1:99
+
+thirdmodel <- lm(NewlyEst ~ Trend + as.factor(Month) + coup + pandemic + Residual, data = alldata)
+summary(thirdmodel)
+checkresiduals(thirdmodel)
+```
+
+In the third model, I've added 2 extraordinary periods which I've mentioned at the beginning of the work. Third model has better values than second model but we still don't use any independent variables.
+
+
+
+# 3. Adding Independent Variables
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata$Residual[1]=0
+ccf(alldata$Residual, alldata$IndProdIndex)
+ccf(alldata$Residual, alldata$BOP)
+ccf(alldata$Residual, alldata$ComLoanInterest)
+ccf(alldata$Residual, alldata$FinConf)
+ccf(alldata$Residual, alldata$ExRate)
+```
+
+
+Here I checked the cross correlations.
+
+
+## 3.1 Industrial Production Index 
+
+```{r warning=FALSE, message=FALSE}
+plot(x=alldata$IndProdIndex, y=thirdmodel$residuals, main = "Industrial Production Index vs Residuals", xlab="Industrial Production Index", ylab="Residuals")
+```
+Looks like positive relationship. 
+
+
+
+## 3.2 Commercial Loan Interest Rate
+
+```{r warning=FALSE, message=FALSE}
+plot(x=alldata$ComLoanInterest, y=thirdmodel$residuals, main = "Commercial Loan Interest Rates vs Residuals", xlab="Commercial Loan Interest Rates", ylab="Residuals")
+
+```
+
+We can talk about a critical level in that graph. Before the %20 interest rate, it looks like usefull but after that point, we can't talk about a relationship.
+
+
+## 3.3 Financial Confidence Rate
+
+```{r warning=FALSE, message=FALSE}
+plot(x=alldata$FinConf, y=thirdmodel$residuals, main = "Financial Confidence Rates vs Residuals", xlab="Financial Confidence Index", ylab="Residuals")
+
+```
+Looks like some degree of positive relationship. We may use this variable in our model.
+
+
+## 3.4 Exchange Rate
+```{r warning=FALSE, message=FALSE}
+
+plot(x=alldata$ExRate, y=thirdmodel$residuals, main = "Exchange Rates vs Residuals", xlab="Exchange Rates", ylab="Residuals")
+
+```
+Looks like an interesting relationship. However, we won't use this variable in our model.
+
+
+
+##  3.5 Balance of Payments
+
+```{r warning=FALSE, message=FALSE}
+plot(x=alldata$BOP, y=thirdmodel$Residuals, main = "BOP vs Residuals", xlab="BOP", ylab="Residuals")
+```
+It doesn't look like a positive relationship here. We won't use this variable in our model.
+
+
+After that point, we will finalize our model with adding related independent variables.
+
+
+
+# 4. Creating the Final Model
+
+
+```{r warning=FALSE, message=FALSE}
+finalmodel <- lm(NewlyEst ~ Trend + as.factor(Month) + FinConf + IndProdIndex  + coup + pandemic + Residual, data = alldata)
+summary(finalmodel)
+checkresiduals(finalmodel)
+```
+We have better values than thirdmodel. But we can still improve it.
+
+
+# 5. LAG Part
+
+
+
+```{r warning=FALSE, message=FALSE}
+alldata[, Residual:=residuals(finalmodel)]
+alldata[, lagvalue:=shift(residuals(finalmodel),1)]
+
+finalmodel2<-lm(NewlyEst ~ Trend+as.factor(Month) + FinConf +IndProdIndex + coup + pandemic + Residual+ lagvalue,alldata)
+summary(finalmodel2)
+
+
+```
+
+After taking into consideration of lag, we got better results. 
+
+# 6. Forecasting Part
+
+Since we don't have any values for March 2021, we will forecast all the variables.
+After forecasting all the values except NewlyEst, we will create the final model.
+
+```{r warning=FALSE, message=FALSE}
+alldata=rbind(alldata, data.table(Date= as.Date("2021-04-01")),fill=T)
+alldata[100,trend:=100]
+
+predict(alldata$IndProdIndex)
+
+
+```
+
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, IndProdIndex := 116.7664]
+
+predict(alldata$BOP)
+
+
+```
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, BOP := -3541.43]
+
+predict(alldata$ComLoanInterest)
+
+
+```   
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, ComLoanInterest := 20.69116]
+
+predict(alldata$FinConf)
+
+```   
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, FinConf := 132.2379]
+
+predict(alldata$ExRate)
+
+```   
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, ExRate := 7.655753]
+
+predict(alldata$Residual)
+
+```   
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, Residual := 829.9922]
+
+predict(alldata$lagvalue)
+
+
+```   
+
+
+
+```{r warning=FALSE, message=FALSE}
+
+alldata[100, lagvalue:= 421.6905]
+
+alldata[100,'Trend':=100]
+alldata[100,'Month':=4]
+alldata[100,'coup':=0]
+alldata[100,'pandemic':=0]
+
+head(alldata)
+```  
+
+
+We find all the values on March 2021, except NewlyEst. Now, we will make our prediction for Newly Established Firms in Turkey on April 2021.
+
+
+```{r warning=FALSE, message=FALSE}
+
+prediction=predict(finalmodel2,alldata)
+prediction[100]
+
+```  
+My prediction is: 9702.09
+We can take it as 9702.
+
+
+```{r,echo=FALSE,eval=FALSE}
+new_alldata = alldata[2:99,]
+
+head(new_alldata)
+finalmodel2$fitted.values
+
+plot(x=new_alldata$Date, y=new_alldata[,NewlyEst], type = "o", xlab = "Date", ylab = "Number of Newly Established")
+lines(x=new_alldata$Date, y=finalmodel2$fitted.values, col = "blue")
+
+```  
+
+This final graph is comparision of my model with real data.
+
+
+# 7. Conclusion
+
+In this work, I used the time period between January 2013 to March 2021 and tried to create models that explain and predict the Newly Established Companies in Turkey, especially for April 2021.
+
+I chose 5 independent variables at the beginning but in the final model I used just 2 of them since I didn't find high degree of relation between these independent variables and the number of Newly Established Firms in Turkey. I used Industrial Total Production Index and Financial Services Confidence. I also added the special periods to the model which are beginning of the pandemic and coup attempt in Turkey. In developing my models, I tried to increase the adjusted R square and residual standard error scores.
+
+In the final, I forecasted 9702.09 for April 2021. Probably, there are lots of other factors that affect this result. As we know, there is some degree of total lockdown in Turkey but hopefully, I got close to the real value which will be announced in a short time.
+
+
+
+
+
+
+=======
+---
+title: Time Series Regression for Predicting Macroeconomic Indicators - Forecasting
+  of Newly Established Firms in April 2021
+author: "Huseyin Sengun - IE360 - Spring 2021"
+---
+
+# 1. INTRODUCTION
+
+The aim of this work is to forecast the total number of newly established firms in Turkey at April 2021 with creating and building some models.  
+
+Throughout the work, the datasets are taken between January 2013 and March 2021. Additionally, the models are created by using some independent variables that possibly affect the time series data, some seasonality factors and by using special periods such as coup attemp and Covid-19 pandemic.
+
+All the datas are taken from EVDS, which is Electronik Data Delivery System, and chosen independent factors are:
+  1. Industrial Price Index
+  2. Balance of Payment
+  3. Commercial Interest Loans
+  4. Financial Confidence Rate
+  5. Exchange Rate (TRY/USD)
+
+
+# 2.Preperation and Manipulation of Data
+
+
+```{r setup,echo=FALSE,results="hide", warning=FALSE, message=FALSE}
+library(ggplot2)
+library(lubridate)
+library(readxl)
+library(data.table)
+library(zoo)
+library(forecast)
+
+```
+
+
+```{r,echo=FALSE,eval=FALSE}
+alldata <- data.table(read_excel("D:/Spring 21 Dersler/IE360/HW3Data.xlsx"))
+#all the datas are from 2013-1 to 2021-3.
+#In IndProd index and BalanceofPayments data, 2021-3 values are missing. So, I take the mean of 2021-2 and 2020-3 and assigned this value to 2021-3 for these datasets.
+
+# Correcting the types of variable
+alldata[,Date:=ym(alldata[,Date])]
+
+head(alldata)
+
+ggplot(alldata, aes(x = Date, y= NewlyEst)) + geom_line(color="blue") + labs(title = "Total Number of Newly Established Firms in Turkey Between 2013-1 and 2020-3", x = "Date", y= "Newly Established Firms") + geom_point()
+
+
+```
+
+From the graph, we can conclude that there is an increasing trend.
+As the time moves, the fluctuations and deviances get bigger probably due to the economic and political instabilities.
+At the periods of coup attemp and starting of Covid-19 pandemic, we see sharp decreases.
+Finally, we can talk about some degrees of seasonality. The graph indicates that number of newly established firms is high in January, and low on July.
+
+
+```{r,echo=FALSE,eval=FALSE}
+
+alldata_zoo=zoo(alldata[,list(NewlyEst,IndProdIndex,BOP,ComLoanInterest,FinConf,ExRate)],alldata$Date)
+plot(alldata_zoo)
+
+str(alldata)
+
+```
+
+In these graphs, we can see how selected independent variables have changed in time.
+
+
+
+```{r,echo=FALSE,eval=FALSE}
+plot(x=alldata$NewlyEst/100, y=alldata$IndProdIndex, xlab = "Newly Established Firms", ylab = "Industrial Production Index")
+plot(x=alldata$NewlyEst/100, y=alldata$BOP, xlab = "Newly Established Firms", ylab = "Balance of Payments")
+plot(x=alldata$NewlyEst/100, y=alldata$ComLoanInterest, xlab = "Newly Established Firms", ylab = "Commercial Loan Interest Rate")
+plot(x=alldata$NewlyEst/100, y=alldata$FinConf, xlab = "Newly Established Firms", ylab = "Financial Confidence Rate")
+plot(x=alldata$NewlyEst/100, y=alldata$ExRate, xlab = "Newly Established Firms", ylab = "Exchange Rate")
+
+```
+In these 5 graphs, we will investigate the possible relationships between the numbers of Newly Established Firms and independent factors. Some of them have some degree of relationship but some of them looks like don't have relationship. 
+
+
+```{r,echo=FALSE,eval=FALSE}
+alldata <- alldata[, Trend:=1:.N]
+Month <- seq(1,12)
+alldata <- cbind(alldata,Month)
+firstmodel<- lm(NewlyEst~ Trend+as.factor(Month), alldata)
+alldata <- alldata[,Residual:=0]
+alldata$Residual[1] = NA
+alldata$Residual[2:99] <- residuals(firstmodel)[1:98]
+secondmodel <- lm(NewlyEst~ Trend+as.factor(Month)+Residual, alldata)
+
+summary(firstmodel)
+summary(secondmodel)
+
+checkresiduals(firstmodel)
+checkresiduals(secondmodel)
+alldata$Residual[1] = 0
+
+```
+
+First, I created a lineer regression model with using Trend and Months.
+In the second model, I added them Residuals.
+Second model has better R-Squared and Residual Standard Error values.  
+
+
+
+```{r,echo=FALSE,eval=FALSE}
+
+alldata$coup <- rep(0,99)
+alldata$coup[43:45] <- rep(1,3)
+
+alldata$pandemic <- rep(0,99)
+alldata$pandemic[88:89] <- c(1,1)
+
+alldata$Trend <- 1:99
+
+thirdmodel <- lm(NewlyEst ~ Trend + as.factor(Month) + coup + pandemic + Residual, data = alldata)
+summary(thirdmodel)
+checkresiduals(thirdmodel)
+```
+
+In the third model, I've added 2 extraordinary periods which I've mentioned at the beginning of the work. Third model has better values than second model but we still don't use any independent variables.
+
+
+
+# 3. Adding Independent Variables
+
+
+```{r,echo=FALSE,eval=FALSE}
+
+alldata$Residual[1]=0
+ccf(alldata$Residual, alldata$IndProdIndex)
+ccf(alldata$Residual, alldata$BOP)
+ccf(alldata$Residual, alldata$ComLoanInterest)
+ccf(alldata$Residual, alldata$FinConf)
+ccf(alldata$Residual, alldata$ExRate)
+```
+
+
+Here I checked the cross correlations.
+
+
+## 3.1 Industrial Production Index 
+
+```{r,echo=FALSE,eval=FALSE}
+plot(x=alldata$IndProdIndex, y=thirdmodel$residuals, main = "Industrial Production Index vs Residuals", xlab="Industrial Production Index", ylab="Residuals")
+```
+Looks like positive relationship. 
+
+
+
+## 3.2 Commercial Loan Interest Rate
+
+```{r,echo=FALSE,eval=FALSE}
+plot(x=alldata$ComLoanInterest, y=thirdmodel$residuals, main = "Commercial Loan Interest Rates vs Residuals", xlab="Commercial Loan Interest Rates", ylab="Residuals")
+
+```
+
+We can talk about a critical level in that graph. Before the %20 interest rate, it looks like usefull but after that point, we can't talk about a relationship.
+
+
+## 3.3 Financial Confidence Rate
+
+```{r,echo=FALSE,eval=FALSE}
+plot(x=alldata$FinConf, y=thirdmodel$residuals, main = "Financial Confidence Rates vs Residuals", xlab="Financial Confidence Index", ylab="Residuals")
+
+```
+Looks like some degree of positive relationship. We may use this variable in our model.
+
+
+
+
+After that point, we will finalize our model with adding related independent variables.
+
+
+
+# 4. Creating the Final Model
+
+
+```{r excrate, echo=FALSE}
+finalmodel <- lm(NewlyEst ~ Trend + as.factor(Month) + FinConf + IndProdIndex  + coup + pandemic + Residual, data = alldata)
+summary(finalmodel)
+checkresiduals(finalmodel)
+```
+We have better values than thirdmodel. But we can still improve it.
+
+
+# 5. LAG Part
+
+
+
+```{r excrate, echo=FALSE}
+alldata[, residuals:=residuals(finalmodel)]
+alldata[, lagvalue:=shift(residuals(finalmodel),1)]
+
+finalmodel2<-lm(NewlyEst ~ Trend+as.factor(Month) + FinConf +IndProdIndex + coup + pandemic + Residual+ lagvalue,alldata)
+summary(finalmodel2)
+
+
+```
+
+After taking into consideration of lag, we got better results. 
+
+# 6. Forecasting Part
+
+Since we don't have any values for March 2021, we will forecast all the variables.
+After forecasting all the values except NewlyEst, we will create the final model.
+
+```{r excrate, echo=FALSE}
+alldata=rbind(alldata, data.table(Date= as.Date("2021-04-01")),fill=T)
+alldata[100,trend:=100]
+
+predict(alldata$IndProdIndex)
+
+
+```
+
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, IndProdIndex := 116.7664]
+
+predict(alldata$BOP)
+
+
+```
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, BOP := -3541.43]
+
+predict(alldata$ComLoanInterest)
+
+
+```   
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, ComLoanInterest := 20.69116]
+
+predict(alldata$FinConf)
+
+```   
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, FinConf := 132.2379]
+
+predict(alldata$ExRate)
+
+```   
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, ExRate := 7.655753]
+
+predict(alldata$Residual)
+
+```   
+
+
+
+```{r excrate, echo=FALSE}
+
+alldata[1:100]
+
+```   
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, Residual := 829.9922]
+
+predict(alldata$lagvalue)
+
+
+```   
+
+```{r excrate, echo=FALSE}
+
+alldata
+
+
+```  
+
+
+```{r excrate, echo=FALSE}
+
+alldata[100, lagvalue:= 421.6905]
+
+alldata[100,'Trend':=100]
+alldata[100,'Month':=4]
+alldata[100,'coup':=0]
+alldata[100,'pandemic':=0]
+
+alldata
+```  
+
+
+We find all the values on March 2021, except NewlyEst. Now, we will make our prediction for Newly Established Firms in Turkey on April 2021.
+
+
+```{r excrate, echo=FALSE}
+
+prediction=predict(finalmodel2,alldata)
+prediction[100]
+
+```  
+My prediction is: 9141.971
+We can take it as 9142.
+
+
+```{r excrate, echo=FALSE}
+new_alldata = alldata[2:99,]
+
+new_alldata
+finalmodel2$fitted.values
+
+plot(x=new_alldata$Date, y=new_alldata[,NewlyEst], type = "o", xlab = "Date", ylab = "Number of Newly Established")
+lines(x=new_alldata$Date, y=finalmodel2$fitted.values, col = "blue")
+
+```  
+
+This final graph is comparision of my model with real data.
+
+
+# 7. Conclusion
+
+In this work, I used the time period between January 2013 to March 2021 and tried to create models that explain and predict the Newly Established Companies in Turkey, especially for April 2021.
+
+I chose 5 independent variables at the beginning but in the final model I used just 2 of them since I didn't find high degree of relation between these independent variables and the number of Newly Established Firms in Turkey. I used Industrial Total Production Index and Financial Services Confidence. I also added the special periods to the model which are beginning of the pandemic and coup attempt in Turkey. In developing my models, I tried to increase the adjusted R square and residual standard error scores.
+
+In the final, I forecasted 9141.971 for April 2021. Probably, there are lots of other factors that affect this result. As we know, there is some degree of total lockdown in Turkey but hopefully, I got close to the real value which will be announced in a short time.
+
+
+
+
+
+
+>>>>>>> f9d5e84853e864216ebde58f9c6a24fb84ba4203
+            
