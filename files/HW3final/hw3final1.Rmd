@@ -1,0 +1,322 @@
+---
+title: "Homework3"
+author: "Huseyin Sengun - IE360 - Spring 2021"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. INTRODUCTION
+
+In this study, we will be trying to understand and predict the tomorrow's hourly electricity consumption of Turkey. The consumption series are made publicly available by EPİAŞ. 
+
+The aim of the report is to understand the properties of the electricity consumption data to build and compare alternative forecasting approaches. Daily consumption series is not stationary due to several reasons. In this task, we will be devising approaches to transform the series to obtain new series that is as stationary as possible. 
+
+The hourly data we are working on is between 01.01.2016 and 20.05.2021. With some analyses, Autoregressive (AR) and Moving Average (MA) models will be established and then, the most appropriate ARMA model will be chosen. Then, by comparing forecasts with actual data, we will calculate the error terms.
+
+
+2. PREPARING DATA AND SOME MANIPULATION
+
+Loading necessary libraries:
+```{r warning=FALSE, message=FALSE}
+library(knitr)
+library(ggplot2)
+library(lubridate)
+library(data.table)
+library(dplyr)
+library(forecast)
+library(urca)
+```
+
+2.1 Reading the Data
+
+```{r warning=FALSE, message=FALSE}
+econsumption <- read.csv("GercekZamanliTuketim-01012016-20052021.csv")
+econsumption <- data.table(econsumption)
+str(econsumption)
+```
+The hourly data is between 01 Jan 2016 and 20 May 2021. There are 47208 observations and three columns. 
+
+
+2.2 Data Manipulation
+
+
+```{r warning=FALSE, message=FALSE}
+names(econsumption) <- c("Date", "Hour", "Consumption")
+econsumption$Date <- as.Date(econsumption$Date, format = "%d.%m.%Y")
+econsumption$Hour <- rep(seq(0,23, by=1), times = nrow(econsumption)/24)
+econsumption[,Consumption:=gsub('\\.', '', Consumption)]
+econsumption[,Consumption:=gsub('\\,', '.', Consumption)]
+econsumption[,Consumption:=as.numeric(Consumption)]
+head(econsumption)
+```
+
+After some manipulation We have our data almost ready. To better understand the data, it would be good to visualize it. 
+The below plots show first looks about the data:
+
+```{r warning=FALSE, message=FALSE}
+ggplot(data=econsumption, aes(x=Date,y=Consumption))+geom_line(col="blue"
+)+labs(x="Date",y="Consumption (MWh)",title="Electricity Consumption in Turkey", subtitle="Between 01.01.2016 to 20.05.2021")
+
+```
+
+
+```{r warning=FALSE, message=FALSE}
+econsumption2017 <- (ggplot(data=econsumption[econsumption$Date>="2017-01-01"&econsumption$Date<="2018-01-01"], aes(x=Date,y=Consumption))+geom_line(col="dark red")
+  +labs(x="Date",y="Consumption (MWh)",title="Consumption in 2017 ")
+)
+econsumption2017
+
+```
+
+With the two plots above, we can conclude some seasonalities and patterns.
+The second plot indicates that the electricity consumption increases during the summer months. Also, there could be seen a somehow decrease during the autumn and spring. There are 2 sharp declines in the electricity consumption which are because of the religious holidays. Also, in the second graph the weekend effect could be seen. 
+
+By looking the first plot, there is a slight increasing trend with the development of the industrial activities and the population.
+
+There is a sharp decrease at the end of the first quarter of 2020 which is about the Covid19 lockdowns and slower industrial activities.
+
+Finally, the lowest consumption is on 27 March 2016. After searching for the day, I conclude that it's not a special day and the consumption data at this day is wrong due to some technical errors with the EPİAŞ, I think.
+
+After visual comments, it would be beneficial to check the autocorrelation and apply the unit root test. 
+
+```{r warning=FALSE, message=FALSE}
+acf(econsumption$Consumption)
+kpsstest=ur.kpss(econsumption$Consumption)
+summary(kpsstest)
+
+```
+After checking the ACF and unit root test, we conclude that data is not stationary. In addition to the visual comments, ACF and KPSS unit root test has proven that data is not stationary.
+
+From now on, our aim is to obtain as much stationary data as possible. Then, we will build AR and MA models and decompose our data at different time levels.
+
+
+
+
+3. DECOMPOSITION of DATA at DIFFERENT TIME LEVELS
+
+We will be decomposing our data at Hourly, Daily and Monthly levels.
+
+3.1 Hourly Level
+
+First, we have to understand if there is a hourly pattern in the data. Therefore, with the frequency of 24, we will plot the data and check some statistics about it.
+
+```{r warning=FALSE, message=FALSE}
+econsumption_hourly <- ts(econsumption$Consumption, freq=24)
+econsumption_hourly_decomposition <- decompose(econsumption_hourly)
+plot(econsumption_hourly_decomposition)
+
+```
+
+```{r warning=FALSE, message=FALSE}
+random_hourly <- econsumption_hourly_decomposition$random
+plot(random_hourly)
+acf(random_hourly, na.action = na.pass)
+kpsstest_hourly=ur.kpss(random_hourly)
+summary(kpsstest_hourly)
+
+
+```
+
+There is still an outlier. Mean is quite constant but variance is slightly increasing.
+
+Test statistic is low but ACF is still not so good.
+
+
+
+3.2 Daily Level
+
+Secondly, we have to understand if there is a daily pattern in the data. Therefore, with the frequency of 24*7, we will plot the data and check some statistics about it.
+
+
+```{r warning=FALSE, message=FALSE}
+econsumption_daily=ts(econsumption$Consumpt,frequency = 24*7)
+econsumption_daily_decomposition <- decompose(econsumption_daily)
+plot(econsumption_daily_decomposition)
+
+```
+Trend component still has seasonality. Variance looks like around zero and has a some degree of constant variance.
+
+```{r warning=FALSE, message=FALSE}
+random_daily <- econsumption_daily_decomposition$random
+plot(random_daily)
+acf(random_daily, na.action = na.pass)
+kpsstest_daily=ur.kpss(random_daily)
+summary(kpsstest_daily)
+
+```
+
+
+3.3 Monthly Level
+
+Thirdly, we have to understand if there is a monthly pattern in the data. Therefore, with the frequency of 24*7*52, we will plot the data and check some statistics about it.
+
+
+
+```{r warning=FALSE, message=FALSE}
+econsumption_monthly=ts(econsumption$Consumpt,frequency = 24*7*52)
+econsumption_monthly_decomposition <- decompose(econsumption_monthly)
+plot(econsumption_monthly_decomposition)
+
+```
+
+Although there is a yearly seasonality, the trend component does not have a seasonality.
+
+
+```{r warning=FALSE, message=FALSE}
+random_monthly <- econsumption_monthly_decomposition$random
+plot(random_monthly)
+acf(random_monthly, na.action = na.pass)
+kpsstest_monthly=ur.kpss(random_monthly)
+summary(kpsstest_monthly)
+
+
+```
+
+Randoms don't have zero mean. Also, KPSS unit root test indicates that data is not stationary.
+
+
+
+4. DECOMPOSING the DATA with the FREQUENCY OF 7*24 
+
+We suppose there is a pattern in every 168 hours. Then, we will decompose the series based on hour&day. I've chosen the additive decomposition method.
+
+
+```{r warning=FALSE, message=FALSE}
+econsumption_additive=ts(econsumption$Consumption,frequency = 24*7)
+consumption_additive_decomposition=decompose(econsumption_additive,type="additive")
+plot(consumption_additive_decomposition)
+
+```
+
+We will continue with this additive decomposition model.
+
+
+
+5. AR MODELS
+
+After we achieve stationary data, now we will try to build an appropriate Autoregressive (AR) model.
+
+
+```{r warning=FALSE, message=FALSE}
+econsumption$random=consumption_additive_decomposition$random
+(ggplot(data=econsumption, aes(x=Date,y=random))+geom_line()
+  +labs(x="Date",y="Random Consumption"))
+
+```
+
+
+Visually, it looks like has a zero mean and constant variance but there are some outliers. Again, we will apply unit root test as a reminder.
+
+```{r warning=FALSE, message=FALSE}
+kpsstest1=ur.kpss(econsumption$random) 
+summary(kpsstest1)
+```
+Now we are ready to fit arima models. Starting from p=1 to p=5, we will analyze the models.
+
+```{r warning=FALSE, message=FALSE}
+ARmodel1<-arima(consumption_additive_decomposition$random, order=c(1,0,0))
+ARmodel2<-arima(consumption_additive_decomposition$random, order=c(2,0,0))
+ARmodel3<-arima(consumption_additive_decomposition$random, order=c(3,0,0))
+ARmodel4<-arima(consumption_additive_decomposition$random, order=c(4,0,0))
+ARmodel5<-arima(consumption_additive_decomposition$random, order=c(5,0,0))
+c(AR1=AIC(ARmodel1), AR2=AIC(ARmodel2), AR3=AIC(ARmodel3), AR4=AIC(ARmodel4), AR5=AIC(ARmodel5) )
+
+```
+AIC values are same for AR4 and AR5. Although there is a decreasing AIC value trend, we will go with the ARmodel4 to keep simplicity.
+
+
+6. MA MODELS
+
+After choosing AR model, now we will try to build an appropriate Moving Average (MA) model.
+
+```{r warning=FALSE, message=FALSE}
+MAmodel1<-arima(consumption_additive_decomposition$random, order=c(0,0,1))
+MAmodel2<-arima(consumption_additive_decomposition$random, order=c(0,0,2))
+MAmodel3<-arima(consumption_additive_decomposition$random, order=c(0,0,3))
+MAmodel4<-arima(consumption_additive_decomposition$random, order=c(0,0,4))
+MAmodel5<-arima(consumption_additive_decomposition$random, order=c(0,0,5))
+c(MA1=AIC(MAmodel1), MA2=AIC(MAmodel2), MA3=AIC(MAmodel3), MA4=AIC(MAmodel4), MA5=AIC(MAmodel5) )
+
+```
+Again, although there is an decreasing AIC value trend, we will take the MAmodel5 and go with it in order to avoid computational complexity. We have chosen the q value as 5.
+`
+
+7. ARMA MODEL
+
+Until now, we have tried different AR and MA models and chosen the p and q values. From now on, we have to build ARMA models. In order to create the most possible appropriate ARMA model, we will try to create models with some different p,q values and choose the one with the lowest AIC value.
+
+
+```{r warning=FALSE, message=FALSE}
+model1 = arima(consumption_additive_decomposition$random, order = c(4,0,5))
+model2 = arima(consumption_additive_decomposition$random, order = c(3,0,5))
+model3 = arima(consumption_additive_decomposition$random, order = c(3,0,4))
+model4 = arima(consumption_additive_decomposition$random, order = c(4,0,4))
+
+c(model1=AIC(model1), model2=AIC(model2), model3=AIC(model3), model4=AIC(model4))
+
+```
+
+
+Model4 seems better with the lowest AIC value. Therefore I choose ARMA(4,4), model4.
+
+
+8. FITTING THE MODEL
+
+```{r warning=FALSE, message=FALSE}
+model_fitted <- consumption_additive_decomposition$random - model4$residuals
+model_transformed <- model_fitted + consumption_additive_decomposition$seasonal + consumption_additive_decomposition$trend
+
+plot(econsumption_additive, type='l')
+points(model_transformed, type = 'l', col=2)
+
+```
+
+9. FORECAST
+
+We will make the forecasts starting from the 6 May 2021 to 20 May 2021. Since we are making hourly predictions, we need to make 336 (24*14) units ahead forecasts. We will use the last trend value and the latest seasonal values.
+
+```{r warning=FALSE, message=FALSE}
+model_forecast <- predict(model4, n.ahead = 336)$pred
+model_forecast <- ts(model_forecast)
+
+last_trend_value <- tail(consumption_additive_decomposition$trend[!is.na(consumption_additive_decomposition$trend)],1)
+seasonality <- consumption_additive_decomposition$seasonal[46873:47208]
+
+model_forecast <- model_forecast + seasonality + last_trend_value
+plot(model_forecast)
+
+```
+
+10. ERROR CALCULATIONS
+
+
+```{r warning=FALSE, message=FALSE}
+actual_data <- econsumption$Consumption[46873:47208]
+test_data <- data.frame(actual_data,model_forecast)
+test_data <- data.table(test_data)
+
+test_data[,Error:=actual_data - model_forecast]
+test_data[,AbsError:=abs(Error)]
+test_data[,Bias:=Error/actual_data]
+test_data[,Ape:=AbsError/actual_data]
+
+test_data
+```
+
+```{r warning=FALSE, message=FALSE}
+mape=sum(test_data$AbsError/actual_data)/336
+
+mad= sum(test_data$AbsError)/336
+
+wmape= mad/mean(actual_data)
+c(mape=mape, mad=mad, wmape=wmape)
+
+```
+Although there are some days that error and deviance values are high, in overall, statistics are relatively small enough.
+
+
+11. CONCLUSION
+
+In that report, the electricity consumption of Turkey between 01.01.2016 and 05.20.2021 was studied. At the beginning, we tried to make the data stationary as much as possible. Data was decomposed at different time levels and an appropriate frequency (168) is chosen. Then, the AR and MA models have created. After the seperate AR-MA models, the ARMA model is chosen with the best possible p and q (4,4) values. With this ARMA model, we made a 14 day forecast of total electricity consumption of Turkey. Finally, we evaluated the model created and calculated the error statistics.
