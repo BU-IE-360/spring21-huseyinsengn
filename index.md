@@ -12,3 +12,7 @@
 ## Homework 2 (May 7)
 
 [Here](files/Homework2/IE360_Spring21_Homework2.html) is my Homework 2.
+
+## Homework 3 (June 7)
+
+[Here](files/HW3final/hw3final1.html) is my Homework 3.
