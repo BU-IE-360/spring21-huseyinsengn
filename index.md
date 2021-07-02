@@ -20,4 +20,4 @@
 
 ## Project (July 2)
 
-[Here](Project/projectreport.Rmd) is Project report.
+[Here](Project/projectreport.html) is Project report, [Here](Project/projectreport.rmd) is my Project .rmd file.
