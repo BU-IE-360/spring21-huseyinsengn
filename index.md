@@ -16,3 +16,8 @@
 ## Homework 3 (June 7)
 
 [Here](files/HW3final/hw3final1.html) is my Homework 3.
+
+
+## Project (July 2)
+
+[Here](Project/projectreport.Rmd) is Project report.
